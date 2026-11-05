@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-
 async function getRate() {
   // Primary: no-key community-operated feed. Validate response and timestamp.
   try {
@@ -41,18 +39,6 @@ async function getRate() {
 
 const { rate, provider, sourceUpdatedAt } = await getRate();
 const checkedAt = new Date().toISOString();
-const file = 'public/history.json';
-let history = [];
-try {
-  const previous = JSON.parse(await fs.readFile(file, 'utf8'));
-  if (Array.isArray(previous)) history = previous;
-} catch (error) {
-  if (error.code !== 'ENOENT') throw error;
-}
-history.push({ checkedAt, sourceUpdatedAt, provider, rate });
-history = history.slice(-240);
-await fs.mkdir('public', { recursive: true });
-await fs.writeFile(file, JSON.stringify(history, null, 2) + '\n');
 console.log(`AED/INR: ${rate}; provider: ${provider}; checked at ${checkedAt}; source updated ${sourceUpdatedAt}`);
 
 const apiKey = process.env.RESEND_API_KEY;
@@ -61,8 +47,6 @@ const sender = process.env.ALERT_FROM_EMAIL;
 if (!apiKey || !recipient || !sender) {
   throw new Error('Missing RESEND_API_KEY, ALERT_TO_EMAIL, or ALERT_FROM_EMAIL');
 }
-const previousRate = history.length > 1 ? history.at(-2).rate : null;
-const delta = previousRate === null ? 'First check' : `${rate >= previousRate ? '+' : ''}${(rate - previousRate).toFixed(4)} INR since previous check`;
 const email = await fetch('https://api.resend.com/emails', {
   method: 'POST',
   headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -70,7 +54,7 @@ const email = await fetch('https://api.resend.com/emails', {
     from: sender,
     to: recipient.split(',').map(value => value.trim()).filter(Boolean),
     subject: `AED/INR update: 1 AED = ₹${rate.toFixed(4)}`,
-    text: `AED/INR rate: ₹${rate.toFixed(4)} per AED\nChange: ${delta}\nProvider: ${provider}\nChecked: ${checkedAt}\nSource last updated: ${sourceUpdatedAt ?? 'Unknown'}\n\nThis email is sent on every scheduled check, even when the rate is unchanged.\n`
+    text: `AED/INR rate: ₹${rate.toFixed(4)} per AED\nProvider: ${provider}\nChecked: ${checkedAt}\nSource last updated: ${sourceUpdatedAt ?? 'Unknown'}\n\nThis email is sent on every scheduled check, even when the rate is unchanged.\n`
   })
 });
 if (!email.ok) throw new Error(`Email delivery request failed (${email.status}): ${await email.text()}`);
