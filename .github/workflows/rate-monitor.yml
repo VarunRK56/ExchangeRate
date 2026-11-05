@@ -1,7 +1,7 @@
 name: AED INR Rate Monitor
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '17 */3 * * *'
   workflow_dispatch:
 
 permissions:
