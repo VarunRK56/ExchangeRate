@@ -1,25 +1,27 @@
 import fs from 'node:fs/promises';
 
 async function getRate() {
-  // Established provider: free plan refreshes hourly, with USD as its base currency.
-  // AED/INR is computed as INR-per-USD divided by AED-per-USD.
-  const appId = process.env.OPEN_EXCHANGE_RATES_APP_ID?.trim();
-  if (appId) {
-    const response = await fetch('https://openexchangerates.org/api/latest.json', {
-      headers: { Authorization: `Token ${appId}` },
+  // Primary: no-key community-operated feed. Validate response and timestamp.
+  try {
+    const response = await fetch('https://api.exchangerate.fun/latest?base=AED', {
+      headers: { Accept: 'application/json' },
       signal: AbortSignal.timeout(20000)
     });
-    if (!response.ok) throw new Error(`Open Exchange Rates returned ${response.status}`);
+    if (!response.ok) throw new Error(`ExchangeRate.fun returned ${response.status}`);
     const data = await response.json();
-    const aed = data?.rates?.AED, inr = data?.rates?.INR;
-    const rate = inr / aed;
-    if (data?.base !== 'USD' || !Number.isFinite(rate) || rate <= 0 ||
+    const rate = data?.rates?.INR;
+    if (data?.base !== 'AED' || !Number.isFinite(rate) || rate <= 0 ||
         !Number.isFinite(data?.timestamp) || data.timestamp <= 0) {
-      throw new Error('Invalid Open Exchange Rates response');
+      throw new Error('Invalid ExchangeRate.fun AED/INR response');
     }
-    return { rate, provider: 'Open Exchange Rates', sourceUpdatedAt: new Date(data.timestamp * 1000).toISOString() };
+    const sourceUpdatedAt = new Date(data.timestamp * 1000).toISOString();
+    if (Number.isNaN(Date.parse(sourceUpdatedAt))) throw new Error('Invalid source timestamp');
+    return { rate, provider: 'ExchangeRate.fun', sourceUpdatedAt };
+  } catch (error) {
+    console.warn(`Primary exchange-rate provider failed; using fallback: ${error.message}`);
   }
-  // Compatibility fallback: retain working notifications until the new API key is configured.
+
+  // Fallback preserves scheduled notifications if the primary API is blocked or down.
   const response = await fetch('https://open.er-api.com/v6/latest/AED', {
     signal: AbortSignal.timeout(20000)
   });
@@ -29,10 +31,12 @@ async function getRate() {
   if (data?.result !== 'success' || !Number.isFinite(rate) || rate <= 0) {
     throw new Error('Invalid ExchangeRate-API response');
   }
-  const rawTime = data.time_last_update_utc;
-  const parsed = rawTime ? new Date(rawTime) : null;
-  return { rate, provider: 'ExchangeRate-API (daily fallback)',
-    sourceUpdatedAt: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : null };
+  const parsed = data.time_last_update_utc ? new Date(data.time_last_update_utc) : null;
+  return {
+    rate,
+    provider: 'ExchangeRate-API (daily fallback)',
+    sourceUpdatedAt: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : null
+  };
 }
 
 const { rate, provider, sourceUpdatedAt } = await getRate();
