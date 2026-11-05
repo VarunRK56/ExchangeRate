@@ -25,6 +25,7 @@ jobs:
           node-version: '22'
       - name: Fetch rate and send email
         env:
+          OPEN_EXCHANGE_RATES_APP_ID: ${{ secrets.OPEN_EXCHANGE_RATES_APP_ID }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           ALERT_TO_EMAIL: ${{ secrets.ALERT_TO_EMAIL }}
           ALERT_FROM_EMAIL: ${{ secrets.ALERT_FROM_EMAIL }}
