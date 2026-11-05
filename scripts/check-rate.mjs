@@ -2,7 +2,7 @@ async function getRate() {
   // Primary: no-key community-operated feed. Validate response and timestamp.
   try {
     const response = await fetch('https://api.exchangerate.fun/latest?base=AED', {
-      headers: { Accept: 'application/json' },
+      headers: { Accept: 'application/json', 'User-Agent': 'ExchangeRateMonitor/1.0' },
       signal: AbortSignal.timeout(20000)
     });
     if (!response.ok) throw new Error(`ExchangeRate.fun returned ${response.status}`);
