@@ -21,7 +21,7 @@ The project started as a Playwright + Jenkins automation proof of concept and no
 | --- | --- |
 | Scheduler / CI | GitHub Actions |
 | Rate retrieval | Node.js Fetch API |
-| Exchange-rate data | [ExchangeRate-API](https://www.exchangerate-api.com/) via [Open Exchange Rates](https://openexchangerates.org/) (hourly free-tier data), with `open.er-api.com` fallback |
+| Exchange-rate data | [ExchangeRate-API](https://www.exchangerate-api.com/) via [ExchangeRate.fun](https://github.com/haxqer/FreeExchangeRateApi) (no API key), with `open.er-api.com` fallback |
 | Email delivery | [Resend](https://resend.com/) |
 | Dashboard | HTML, CSS, JavaScript, SVG |
 | Dashboard hosting | [Vercel](https://vercel.com/) |
@@ -53,7 +53,7 @@ GitHub Actions (every 3 hours / manual dispatch)
                    Web dashboard
 ```
 
-The configured Open Exchange Rates free-tier data is updated hourly; without its API key, the existing daily-rate provider remains active. A scheduled check is not necessarily a new market-data update.
+ExchangeRate.fun advertises hourly updates; the existing daily provider is used if the primary API fails. A scheduled check is not necessarily a new market-data update.
 
 ## Repository structure
 
@@ -84,12 +84,9 @@ ExchangeRate/
 
 | Secret | Description |
 | --- | --- |
-| `OPEN_EXCHANGE_RATES_APP_ID` | Open Exchange Rates API app ID (enables hourly data; without it, the daily provider remains active) |
 | `RESEND_API_KEY` | Your private Resend API key |
 | `ALERT_TO_EMAIL` | Email address receiving the notifications |
 | `ALERT_FROM_EMAIL` | Resend-authorized sender address |
-
-Sign up at [Open Exchange Rates](https://openexchangerates.org/signup) and add its app ID as `OPEN_EXCHANGE_RATES_APP_ID` to activate hourly data. The free plan uses USD as the base; AED/INR is calculated from the AED and INR USD-based rates. Without this secret, the existing daily provider remains in use.
 
 For a limited test, Resend supports `onboarding@resend.dev`, subject to its test-recipient restrictions. For production sending, verify a domain in Resend and use an address from that domain.
 
