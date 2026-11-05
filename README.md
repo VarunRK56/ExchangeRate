@@ -21,7 +21,7 @@ The project started as a Playwright + Jenkins automation proof of concept and no
 | --- | --- |
 | Scheduler / CI | GitHub Actions |
 | Rate retrieval | Node.js Fetch API |
-| Exchange-rate data | [ExchangeRate-API](https://www.exchangerate-api.com/) via `open.er-api.com` |
+| Exchange-rate data | [ExchangeRate-API](https://www.exchangerate-api.com/) via [ExchangeRate.fun](https://github.com/haxqer/FreeExchangeRateApi) (no API key), with `open.er-api.com` fallback |
 | Email delivery | [Resend](https://resend.com/) |
 | Dashboard | HTML, CSS, JavaScript, SVG |
 | Dashboard hosting | [Vercel](https://vercel.com/) |
@@ -53,7 +53,7 @@ GitHub Actions (every 3 hours / manual dispatch)
                    Web dashboard
 ```
 
-The rate API may refresh less often than every three hours. A scheduled check is not necessarily a new market-data update.
+ExchangeRate.fun advertises hourly updates; the existing daily provider is used if the primary API fails. A scheduled check is not necessarily a new market-data update.
 
 ## Repository structure
 
@@ -141,7 +141,7 @@ Each successful check sends a message containing:
 - Latest AED/INR exchange rate
 - Change compared with the previous recorded check
 - Check timestamp
-- Source-data update timestamp
+- Exchange-rate provider and source-data update timestamp and provider
 
 **Emails are sent on every successful check, even when the exchange rate is unchanged.** If email delivery is rejected by Resend, the workflow fails instead of silently reporting success.
 

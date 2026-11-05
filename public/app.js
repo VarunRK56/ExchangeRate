@@ -39,6 +39,7 @@ async function load() {
     byId('rate').textContent = fmtRate(latest.rate);
     byId('checked').textContent = fmtDate(latest.checkedAt);
     byId('source').textContent = fmtDate(latest.sourceUpdatedAt);
+    byId('provider').textContent = latest.provider || 'ExchangeRate-API (legacy observation)';
     byId('status').textContent = Date.now()-new Date(latest.checkedAt).getTime()>4*3600000?'Delayed':'Updated';
     byId('change').textContent = previous ? `Change since previous check: ${(latest.rate-previous.rate).toFixed(4)} INR`:'First observation';
     byId('count').textContent = valid.length+' observations';
