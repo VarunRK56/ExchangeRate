@@ -1,7 +1,5 @@
 name: AED INR Rate Monitor
 on:
-  push:
-    branches: [test/primary-api-user-agent]
   schedule:
     - cron: '0 */3 * * *'
   workflow_dispatch:
