@@ -1,15 +1,42 @@
 import fs from 'node:fs/promises';
 
-const endpoint = 'https://open.er-api.com/v6/latest/AED';
-const response = await fetch(endpoint, { signal: AbortSignal.timeout(20000) });
-if (!response.ok) throw new Error(`Exchange API returned ${response.status}`);
-const data = await response.json();
-const rate = data?.rates?.INR;
-if (data?.result !== 'success' || !Number.isFinite(rate) || rate <= 0) {
-  throw new Error('Invalid AED/INR rate from API');
+async function getRate() {
+  // Established provider: free plan refreshes hourly, with USD as its base currency.
+  // AED/INR is computed as INR-per-USD divided by AED-per-USD.
+  const appId = process.env.OPEN_EXCHANGE_RATES_APP_ID?.trim();
+  if (appId) {
+    const response = await fetch('https://openexchangerates.org/api/latest.json', {
+      headers: { Authorization: `Token ${appId}` },
+      signal: AbortSignal.timeout(20000)
+    });
+    if (!response.ok) throw new Error(`Open Exchange Rates returned ${response.status}`);
+    const data = await response.json();
+    const aed = data?.rates?.AED, inr = data?.rates?.INR;
+    const rate = inr / aed;
+    if (data?.base !== 'USD' || !Number.isFinite(rate) || rate <= 0 ||
+        !Number.isFinite(data?.timestamp) || data.timestamp <= 0) {
+      throw new Error('Invalid Open Exchange Rates response');
+    }
+    return { rate, provider: 'Open Exchange Rates', sourceUpdatedAt: new Date(data.timestamp * 1000).toISOString() };
+  }
+  // Compatibility fallback: retain working notifications until the new API key is configured.
+  const response = await fetch('https://open.er-api.com/v6/latest/AED', {
+    signal: AbortSignal.timeout(20000)
+  });
+  if (!response.ok) throw new Error(`ExchangeRate-API returned ${response.status}`);
+  const data = await response.json();
+  const rate = data?.rates?.INR;
+  if (data?.result !== 'success' || !Number.isFinite(rate) || rate <= 0) {
+    throw new Error('Invalid ExchangeRate-API response');
+  }
+  const rawTime = data.time_last_update_utc;
+  const parsed = rawTime ? new Date(rawTime) : null;
+  return { rate, provider: 'ExchangeRate-API (daily fallback)',
+    sourceUpdatedAt: parsed && !Number.isNaN(parsed.getTime()) ? parsed.toISOString() : null };
 }
+
+const { rate, provider, sourceUpdatedAt } = await getRate();
 const checkedAt = new Date().toISOString();
-const sourceUpdatedAt = data.time_last_update_utc ?? null;
 const file = 'public/history.json';
 let history = [];
 try {
@@ -18,11 +45,11 @@ try {
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
 }
-history.push({ checkedAt, sourceUpdatedAt, rate });
+history.push({ checkedAt, sourceUpdatedAt, provider, rate });
 history = history.slice(-240);
 await fs.mkdir('public', { recursive: true });
 await fs.writeFile(file, JSON.stringify(history, null, 2) + '\n');
-console.log(`AED/INR: ${rate}; checked at ${checkedAt}; source updated ${sourceUpdatedAt}`);
+console.log(`AED/INR: ${rate}; provider: ${provider}; checked at ${checkedAt}; source updated ${sourceUpdatedAt}`);
 
 const apiKey = process.env.RESEND_API_KEY;
 const recipient = process.env.ALERT_TO_EMAIL;
@@ -39,7 +66,7 @@ const email = await fetch('https://api.resend.com/emails', {
     from: sender,
     to: recipient.split(',').map(value => value.trim()).filter(Boolean),
     subject: `AED/INR update: 1 AED = ₹${rate.toFixed(4)}`,
-    text: `AED/INR rate: ₹${rate.toFixed(4)} per AED\nChange: ${delta}\nChecked: ${checkedAt}\nSource last updated: ${sourceUpdatedAt ?? 'Unknown'}\n\nThis email is sent on every scheduled check, even when the rate is unchanged.\n`
+    text: `AED/INR rate: ₹${rate.toFixed(4)} per AED\nChange: ${delta}\nProvider: ${provider}\nChecked: ${checkedAt}\nSource last updated: ${sourceUpdatedAt ?? 'Unknown'}\n\nThis email is sent on every scheduled check, even when the rate is unchanged.\n`
   })
 });
 if (!email.ok) throw new Error(`Email delivery request failed (${email.status}): ${await email.text()}`);
